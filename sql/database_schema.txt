@@ -16,8 +16,6 @@ CREATE UNIQUE INDEX ix_isbncache_13
 CREATE TABLE booklist(
   id       INTEGER PRIMARY KEY ASC,
   isbn13   TEXT UNIQUE NOT NULL,
-  quantity INTEGER NOT NULL
-             CHECK (quantity >= 0),
   title    TEXT NOT NULL,
   entry    INTEGER NOT NULL
              CHECK (entry >= 0)
