@@ -20,6 +20,11 @@ if (__FILE__ === $_SERVER['SCRIPT_FILENAME']) {
 ////////////////////////////////////////////////////////////////////////
 
 /*
+ * The name to display in the header over the book list.
+ */
+const LISTNAME_TEXT = 'My Library';
+
+/*
  * The file name of the main entry form.
  * 
  * This file should be in the same directory as the other scripts.
@@ -62,9 +67,71 @@ const BOOKDB_COVERS_DIR = '/home/example_user/covers';
 
 ////////////////////////////////////////////////////////////////////////
 //                                                                    //
+//                          Other constants                           //
+//                                                                    //
+////////////////////////////////////////////////////////////////////////
+
+/*
+ * The special code at the beginning of the User-Agent string for the
+ * barcode scanning browser.
+ */
+const SCANNER_UA = 'scan_to_web';
+
+/*
+ * The font family imports.
+ * 
+ * See main.css for more information.
+ */
+const CSS_FAMILIES =
+  'family=Merriweather&family=Roboto&family=Roboto+Mono';
+
+////////////////////////////////////////////////////////////////////////
+//                                                                    //
 //                              Functions                             //
 //                                                                    //
 ////////////////////////////////////////////////////////////////////////
+
+/*
+ * Determine with a User-Agent query whether the client is using the
+ * special "Scan To Web" barcode-enabled browser.
+ * 
+ * If this returns true, you can safely use extensions that are designed
+ * for that special web browser.  Otherwise, extensions should not be
+ * displayed.
+ * 
+ * Return:
+ * 
+ *   true if using "Scan To Web" browser, false if not
+ */
+function usingScanner() {
+  
+  // Get the user-agent string
+  $ua = $_SERVER['HTTP_USER_AGENT'];
+  
+  // Trim leading and trailing whitespace
+  $ua = trim($ua);
+  
+  // Begin with false result
+  $result = false;
+  
+  // Only proceed if UA string long enough for the scanner UA
+  if (strlen($ua) >= strlen(SCANNER_UA)) {
+    // Get the beginning of the UA with a length matching the scanner
+    // UA
+    $ua = substr($ua, 0, strlen(SCANNER_UA));
+    
+    // Lowercase transform
+    $ua = strtolower($ua);
+    
+    // Check if equal to scanner UA
+    if ($ua === SCANNER_UA) {
+      $result = true;
+    }
+  }
+  
+  // Return result
+  return $result;
+}
 
 /*
  * Send a redirect to the client so that they go to the main ISBN input
