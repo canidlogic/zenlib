@@ -1,0 +1,44 @@
+BEGIN EXCLUSIVE TRANSACTION;
+
+CREATE TABLE isbncache(
+  id     INTEGER PRIMARY KEY ASC,
+  isbn10 TEXT UNIQUE NOT NULL,
+  isbn13 TEXT UNIQUE NOT NULL,
+  json   TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX ix_isbncache_10
+  ON isbncache(isbn10);
+
+CREATE UNIQUE INDEX ix_isbncache_13
+  ON isbncache(isbn13);
+
+CREATE TABLE booklist(
+  id       INTEGER PRIMARY KEY ASC,
+  isbn13   TEXT UNIQUE NOT NULL,
+  quantity INTEGER NOT NULL
+             CHECK (quantity >= 0),
+  title    TEXT NOT NULL,
+  entry    INTEGER NOT NULL
+             CHECK (entry >= 0)
+);
+
+CREATE UNIQUE INDEX ix_booklist_13
+  ON booklist(isbn13);
+
+CREATE INDEX ix_booklist_title
+  ON booklist(title);
+
+CREATE INDEX ix_booklist_entry
+  ON booklist(entry);
+
+CREATE TABLE vars(
+  id   INTEGER PRIMARY KEY ASC,
+  name TEXT UNIQUE NOT NULL,
+  val  TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX ix_vars_name
+  ON vars(name);
+
+END TRANSACTION;
