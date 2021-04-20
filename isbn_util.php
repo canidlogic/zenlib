@@ -29,7 +29,7 @@ const MAINFORM_FILE_NAME = 'isbn.html';
 /*
  * The full path on the server to the SQLite database for the books.
  */
-const BOOKDB_PATH = '/home/tundra/data/mzc/books.sqlite';
+const BOOKDB_PATH = '/home/example_user/books.sqlite';
 
 /*
  * The full path on the server to the directory holding cover image
@@ -37,7 +37,7 @@ const BOOKDB_PATH = '/home/tundra/data/mzc/books.sqlite';
  * 
  * Do NOT include the trailing slash on this directory name.
  */
-const BOOKDB_COVERS_DIR = '/home/tundra/data/mzc/covers';
+const BOOKDB_COVERS_DIR = '/home/example_user/covers';
 
 ////////////////////////////////////////////////////////////////////////
 //                                                                    //
