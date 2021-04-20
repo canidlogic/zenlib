@@ -1,0 +1,76 @@
+/*
+ * You need to import fonts before linking to this stylesheet.  The
+ * import statement are these two elements:
+ * 
+ *   <link rel="preconnect" href="https://fonts.gstatic.com"/>
+ *   <link
+ *       href="https://fonts.googleapis.com/css2?{fam}&display=swap"
+ *       rel="stylesheet"/>
+ * 
+ *   where {fam} is the following:
+ * 
+ *     family=Merriweather&family=Roboto&family=Roboto+Mono
+ * 
+ * The {fam} string is stored int usbn_util.php as the constant
+ * CSS_FAMILIES.
+ * 
+ * You can then import this stylesheet as follows:
+ * 
+ *   <link href="main.css" rel="stylesheet"/>
+ * 
+ * Uses the following fonts:
+ * 
+ *   - Merriweather [Serif]
+ *   - Roboto       [Sans Serif]
+ *   - Roboto Mono  [Monospace]
+ * 
+ * The following declarations are used within CSS 
+ * 
+ *   font-family: 'Merriweather', serif;
+ *   font-family: 'Roboto', sans-serif;
+ *   font-family: 'Roboto Mono', monospace;
+ */
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+:link {
+  text-decoration: none;
+  color: blue
+}
+
+:visited {
+  text-decoration: none;
+  color: blue
+}
+
+h1 {
+  font-family: 'Merriweather', serif;
+}
+
+h2 {
+  font-family: 'Merriweather', serif;
+}
+
+h3 {
+  font-family: 'Merriweather', serif;
+}
+
+.entryctl {
+  font-family: 'Roboto Mono', monospace;
+  font-size: larger;
+}
+
+.ctlbtn {
+  font-size: larger;
+  padding: 0.5em;
+  border: medium outset silver;
+  background-color: WhiteSmoke;
+  color: blue;
+  cursor: pointer;
+}
+
+.eret {
+  margin-top: 2.5em;
+}
