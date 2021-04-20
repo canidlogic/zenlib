@@ -1,0 +1,7 @@
+INSERT INTO vars
+  (name, val) VALUES
+  ('isbndb_key', 'YOUR_API_KEY');
+
+INSERT INTO vars
+  (name, val) VALUES
+  ('isbndb_url', 'https://api2.isbndb.com/book/');
