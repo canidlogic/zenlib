@@ -97,6 +97,10 @@ function report_err($msg, $code) {
  * optionally the URL and API key for ISBNdb, query databases to get a
  * JSON object with information about the book.
  * 
+ * You should wrap the call to this function within a BEGIN IMMEDIATE
+ * transaction so that everything is performed at once, and if an
+ * Exception is thrown, rollback.
+ * 
  * If an error occurs, an Exception is thrown with a relevant error
  * message.
  * 
@@ -481,6 +485,11 @@ function queryISBN($isbn) {
       throw new Exception("Couldn't open local database");
     }
     
+    // Use a deferred transaction to read API url/key at one time
+    if ($db->exec("BEGIN DEFERRED TRANSACTION") !== true) {
+      throw new Exception("Couldn't begin key transaction");
+    }
+    
     // Query for the ISBNdb URL, or set URL to NULL if variable not
     // defined
     $qr = NULL;
@@ -501,6 +510,10 @@ function queryISBN($isbn) {
         // Get the URL
         $isbndb_url = $r['val'];
       }
+    
+    } catch (Exception $e) {
+      $db->exec("ROLLBACK TRANSACTION");
+      throw $e;
     
     } finally {
       // Close result set if open
@@ -534,6 +547,10 @@ function queryISBN($isbn) {
         // Get the API key
         $isbndb_key = $r['val'];
         
+      } catch (Exception $e) {
+        $db->exec("ROLLBACK TRANSACTION");
+        throw $e;
+        
       } finally {
         // Close result set if open
         if (is_null($qr) === false) {
@@ -543,8 +560,104 @@ function queryISBN($isbn) {
       }
     }
     
-    // Call through to the database function
-    $result = dbISBN($isbn, $db, $isbndb_url, $isbndb_key);
+    // End the transaction for reading the API key/url
+    if ($db->exec("COMMIT TRANSACTION") !== true) {
+      throw new Exception("Couldn't commit key transaction");
+    }
+    
+    // Call through to the database function, wrapped in transaction
+    if ($db->exec("BEGIN IMMEDIATE TRANSACTION") !== true) {
+      throw new Exception("Could not create ISBN transaction");
+    }
+    try {
+      $result = dbISBN($isbn, $db, $isbndb_url, $isbndb_key);
+    } catch (Exception $e) {
+      $db->exec("ROLLBACK TRANSACTION");
+      throw $e;
+    }
+    if ($db->exec("COMMIT TRANSACTION") !== true) {
+      throw new Exception("Could not commit ISBN transaction");
+    }
+    
+  } finally {
+    // Close database connection if open
+    if (is_null($db) !== true) {
+      $db->close();
+      unset($db);
+    }
+  }
+  
+  // Return result
+  return $result;
+}
+
+/*
+ * Given a valid, normalized ISBN-13 number, determine whether the book
+ * is recorded in the database.
+ * 
+ * This does NOT check whether information about the book is in the ISBN
+ * cache.  Rather, it checks whether the book is in the booklist table.
+ * 
+ * Exceptions are thrown if there is a problem.
+ * 
+ * Parameters:
+ * 
+ *   $isbn13 : string - the valid, normalized ISBN-13 to look for
+ * 
+ * Return:
+ * 
+ *   true if book is recorded, false otherwise
+ */
+function hasBook($isbn13) {
+  
+  // Exception if we weren't given a valid ISBN
+  if (checkISBN($isbn13) !== true) {
+    throw new Exception('ISBN-13 is not valid');
+  }
+  
+  // Exception if we weren't given an ISBN-13
+  if (strlen($isbn13) !== 13) {
+    throw new Exception('ISBN-13 is required');
+  }
+  
+  // Attempt to open a local database connection, and wrap in a
+  // try-finally block so database connection always closed on exit
+  $db = NULL;
+  $result = false;
+  try {
+    // Open the database
+    try {
+      $db = new SQLite3(BOOKDB_PATH, SQLITE3_OPEN_READONLY);
+    } catch (Exception $e) {
+      throw new Exception("Couldn't open local database");
+    }
+    
+    // Query for the book
+    $qr = NULL;
+    try {
+      // Perform the query
+      $qr = $db->query(
+        "SELECT isbn13 FROM booklist WHERE isbn13='$isbn13'");
+      if ($qr === false) {
+        $qr = NULL;
+        throw new Exception("Couldn't query local database");
+      }
+      
+      // Get the row as an associative array
+      $r = $qr->fetchArray(SQLITE3_ASSOC);
+      
+      // If we managed to get a result row, the book is in the database
+      if ($r !== false) {
+        $result = true;
+      }
+    
+    } finally {
+      // Close result set if open
+      if (is_null($qr) === false) {
+        $qr->finalize();
+        $qr = NULL;
+      }
+    }
     
   } finally {
     // Close database connection if open
@@ -599,15 +712,65 @@ $result = NULL;
 try {
   // Perform the query
   $result = queryISBN($isbn);
-  if ($result === false) {
-    report_err(
-      "Can't locate book for requested URL!",
-      400);
-  }
   
 } catch (Exception $e) {
   // Report the error and leave
   report_err('Error during cURL: ' . $e->getMessage(), 500);
+}
+
+// Check whether record was found
+//
+if ($result === false) {
+  report_err(
+    "Can't locate book for requested ISBN!",
+    400);
+}
+
+// Record must have ISBN-13 and title fields
+//
+if ((array_key_exists('isbn13', $result) !== true) ||
+    (array_key_exists('title', $result) !== true)) {
+  report_err(
+    "Book record missing critical fields!",
+    500);
+}
+
+// Check whether there is a cover image
+//
+$has_cover = false;
+if (array_key_exists('image', $result)) {
+  $has_cover = true;
+}
+
+// Set display flags to default
+//
+$show_add = false;
+$show_list = true;
+
+// If there is an action GET parameter, determine what additional
+// information to show with the flags; otherwise leave at default; also
+// leave at default if action not recognized
+//
+if (array_key_exists('action', $_GET)) {
+  if ($_GET['action'] === 'add') {
+    $show_add = true;
+    $show_list = false;
+  }
+}
+
+// If we are showing the add book panel, determine whether book already
+// added to database
+//
+$already_entered = false;
+if ($show_add) {
+  try {
+    if (hasBook(normISBN($result['isbn13']))) {
+      $already_entered = true;
+    }
+    
+  } catch (Exception $e) {
+    report_err("Error during query: " . $e->getMessage(), 500);
+  }
 }
 
 // Wrapper around htmlspecialchars() that is appropriate for table
@@ -616,6 +779,14 @@ try {
 function wt($str) {
   return htmlspecialchars(
           $str, ENT_NOQUOTES | ENT_HTML5, 'UTF-8', true);
+}
+
+// Wrapper around htmlspecialchars() that is appropriate for attribute
+// output below
+//
+function wa($str) {
+  return htmlspecialchars(
+          $str, ENT_COMPAT | ENT_HTML5, 'UTF-8', true);
 }
 
 ?><!DOCTYPE html>
@@ -631,7 +802,10 @@ th {
   text-align: left;
 }
 td {
-  padding-left: 1em;
+  padding-left: 0.5em;
+}
+.imgtd {
+  padding-left: 0;
 }
 
     </style>
@@ -640,263 +814,82 @@ td {
 
     <h1>Book ISBN detail</h1>
 
-      <table>
-        <tr>
-          <th>ISBN:</th>
 <?php
-if (array_key_exists('isbn', $result)) {
+if ($show_add) {
+  if ($already_entered) {
 ?>
-          <td><?php echo wt($result['isbn']); ?></td>
+    <p>Book is already entered in database.</p>
 <?php
-} else {
+  } else {
 ?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>ISBN-13:</th>
-<?php
-if (array_key_exists('isbn13', $result)) {
-?>
-          <td><?php echo wt($result['isbn13']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-        <tr>
-          <th>Title:</th>
-<?php
-if (array_key_exists('title', $result)) {
-?>
-          <td><?php echo wt($result['title']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Title (long):</th>
-<?php
-if (array_key_exists('title_long', $result)) {
-?>
-          <td><?php echo wt($result['title_long']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-
-<?php
-if (array_key_exists('authors', $result)) {
-  $a = $result['authors'];
-  $c = count($a);
-  for($x = 0; $x < $c; $x++) {
-    if ($x < 1) {
-?>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-<?php
-    }
-?>
-        <tr>
-          <th>Author(s):</th>
-          <td><?php echo wt($a[$x]); ?></td>
-        </tr>
+    <form action="<?php echo ADDBOOK_FILE_NAME;
+      ?>" method="post" accept-charset="utf-8">
+      <input
+          type="hidden"
+          name="isbn13"
+          id="isbn13"
+          value="<?php
+echo wa(normISBN($result['isbn13']));
+            ?>"/>
+      <input
+          type="hidden"
+          name="book_title"
+          id="book_title"
+          value="<?php
+echo wa($result['title']);
+            ?>"/>
+      
+      <p>
+        <input type="submit" value="Add book"/>
+      </p>
+    </form>
 <?php
   }
-}
 ?>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-        <tr>
-          <th>Publisher:</th>
-<?php
-if (array_key_exists('publisher', $result)) {
-?>
-          <td><?php echo wt($result['publisher']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
+    <p>
+      <a href="<?php echo MAINFORM_FILE_NAME; ?>">
+        Return to ISBN form
+      </a>
+    </p>
 <?php
 }
 ?>
-        </tr>
-        <tr>
-          <th>Date published:</th>
-<?php
-if (array_key_exists('date_published', $result)) {
-?>
-          <td><?php echo wt($result['date_published']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Edition</th>
-<?php
-if (array_key_exists('edition', $result)) {
-?>
-          <td><?php echo wt($result['edition']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Binding</th>
-<?php
-if (array_key_exists('binding', $result)) {
-?>
-          <td><?php echo wt($result['binding']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Pages</th>
-<?php
-if (array_key_exists('pages', $result)) {
-?>
-          <td><?php echo wt(strval($result['pages'])); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Dimensions</th>
-<?php
-if (array_key_exists('dimensions', $result)) {
-?>
-          <td><?php echo wt($result['dimensions']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-        <tr>
-          <th>Dewey decimal:</th>
-<?php
-if (array_key_exists('dewey_decimal', $result)) {
-?>
-          <td><?php echo wt($result['dewey_decimal']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Language:</th>
-<?php
-if (array_key_exists('language', $result)) {
-?>
-          <td><?php echo wt($result['language']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-<?php
-if (array_key_exists('subjects', $result)) {
-  $a = $result['subjects'];
-  $c = count($a);
-  for($x = 0; $x < $c; $x++) {
-    if ($x < 1) {
-?>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-<?php
-    }
-?>
-        <tr>
-          <th>Subject(s):</th>
-          <td><?php echo wt($a[$x]); ?></td>
-        </tr>
-<?php
-  }
-}
-?>        
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
-        <tr>
-          <th>Overview:</th>
-<?php
-if (array_key_exists('overview', $result)) {
-?>
-          <td><?php echo wt($result['overview']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Synposis:</th>
-<?php
-if (array_key_exists('synopsys', $result)) {
-?>
-          <td><?php echo wt($result['synopsys']); ?></td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-        <tr>
-          <th>Cover:</th>
-<?php
-if (array_key_exists('image', $result)) {
-?>
-          <td>
-<img src="isbn_cover.php?isbn=<?php echo wt($result['isbn13']); ?>"/>
-          </td>
-<?php
-} else {
-?>
-          <td>&nbsp;</td>
-<?php
-}
-?>
-        </tr>
-      </table>
 
+<?php
+if ($show_list) {
+?>
+    <p>
+      <a href="<?php echo BOOKLIST_FILE_NAME; ?>">
+        Return to book list
+      </a>
+    </p>
+<?php
+}
+?>
+
+    <table>
+      <tr>
+        <th>Title:</th>
+        <td><?php echo wt($result['title']); ?></td>
+      </tr>
+      <tr>
+        <th>ISBN:</th>
+        <td><?php echo wt($result['isbn13']); ?></td>
+      </tr>
+<?php
+if ($has_cover) {
+?>
+      <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+      <tr>
+        <td colspan="2" class="imgtd">
+          <img src="isbn_cover.php?isbn=<?php
+echo wa($result['isbn13']);
+            ?>"/>
+        </td>
+      </tr>
+<?php
+}
+?>
+    </table>
   </body>
 </html>
