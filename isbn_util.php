@@ -24,7 +24,28 @@ if (__FILE__ === $_SERVER['SCRIPT_FILENAME']) {
  * 
  * This file should be in the same directory as the other scripts.
  */
-const MAINFORM_FILE_NAME = 'isbn.html';
+const MAINFORM_FILE_NAME = 'isbn.php';
+
+/*
+ * The file name of the ISBN detail form.
+ * 
+ * This file should be in the same directory as the other scripts.
+ */
+const ISBNDETAIL_FILE_NAME = 'isbn_detail.php';
+
+/*
+ * The file name of the main book list.
+ * 
+ * This file should be in the same directory as the other scripts.
+ */
+const BOOKLIST_FILE_NAME = 'list.php';
+
+/*
+ * The file name of the book entry script.
+ * 
+ * This file should be in the same directory as the other scripts.
+ */
+const ADDBOOK_FILE_NAME = 'add_book.php';
 
 /*
  * The full path on the server to the SQLite database for the books.
