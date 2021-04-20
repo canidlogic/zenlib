@@ -69,11 +69,17 @@ function report_err($msg, $code) {
     <title>Add book</title>
     <meta name="viewport" 
         content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com"/>
+    <link
+      href="https://fonts.googleapis.com/css2?<?php echo CSS_FAMILIES;
+              ?>&display=swap"
+      rel="stylesheet"/>
+    <link href="main.css" rel="stylesheet"/>
   </head>
   <body>
     <h1>Error</h1>
     <p><?php echo $msg; ?></p>
-    <p>
+    <p class="eret">
       <a href="<?php echo MAINFORM_FILE_NAME; ?>">
         Return to ISBN form
       </a>
