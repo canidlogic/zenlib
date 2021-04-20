@@ -3,7 +3,7 @@
 /*
  * Include the common utilities script
  */
-require_once '/home/tundra/data/mzc/isbn_util.php';
+require_once 'isbn_util.php';
 
 ////////////////////////////////////////////////////////////////////////
 //                                                                    //
