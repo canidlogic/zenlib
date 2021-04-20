@@ -69,12 +69,18 @@ function report_err($msg, $code) {
     <title>Book ISBN detail</title>
     <meta name="viewport" 
         content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com"/>
+    <link
+      href="https://fonts.googleapis.com/css2?<?php echo CSS_FAMILIES;
+              ?>&display=swap"
+      rel="stylesheet"/>
+    <link href="main.css" rel="stylesheet"/>
   </head>
   <body>
     <h1>Error</h1>
     <p><?php echo $msg; ?></p>
-    <p>
-      <a href="<?php echo MAINFORM_FILE_NAME; ?>">
+    <p class="eret">
+      <a href="<?php echo MAINFORM_FILE_NAME; ?>" class="ctlbtn">
         Return to ISBN form
       </a>
     </p>
@@ -796,16 +802,36 @@ function wa($str) {
     <title>Book ISBN detail</title>
     <meta name="viewport" 
         content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com"/>
+    <link
+      href="https://fonts.googleapis.com/css2?<?php echo CSS_FAMILIES;
+              ?>&display=swap"
+      rel="stylesheet"/>
+    <link href="main.css" rel="stylesheet"/>
     <style>
 
 th {
   text-align: left;
+  font-family: 'Merriweather', serif;
+  vertical-align: top;
 }
+
 td {
   padding-left: 0.5em;
+  vertical-align: top;
 }
+
 .imgtd {
   padding-left: 0;
+}
+
+.alr {
+  font-weight: bold;
+  margin-bottom: 1.5em;
+}
+
+#infotbl {
+  margin-top: 2.5em;
 }
 
     </style>
@@ -818,7 +844,12 @@ td {
 if ($show_add) {
   if ($already_entered) {
 ?>
-    <p>Book is already entered in database.</p>
+    <p class="alr">Book is already entered in database.</p>
+    <p>
+      <a href="<?php echo MAINFORM_FILE_NAME; ?>" class="ctlbtn">
+        Return to ISBN form
+      </a>
+    </p>
 <?php
   } else {
 ?>
@@ -840,18 +871,15 @@ echo wa($result['title']);
             ?>"/>
       
       <p>
-        <input type="submit" value="Add book"/>
+        <input type="submit" value="Add book" class="ctlbtn"/>
+        &nbsp;&nbsp;
+        <a href="<?php echo MAINFORM_FILE_NAME; ?>" class="ctlbtn">
+          Return to ISBN form
+        </a>
       </p>
     </form>
 <?php
   }
-?>
-    <p>
-      <a href="<?php echo MAINFORM_FILE_NAME; ?>">
-        Return to ISBN form
-      </a>
-    </p>
-<?php
 }
 ?>
 
@@ -859,7 +887,7 @@ echo wa($result['title']);
 if ($show_list) {
 ?>
     <p>
-      <a href="<?php echo BOOKLIST_FILE_NAME; ?>">
+      <a href="<?php echo BOOKLIST_FILE_NAME; ?>" class="ctlbtn">
         Return to book list
       </a>
     </p>
@@ -867,7 +895,7 @@ if ($show_list) {
 }
 ?>
 
-    <table>
+    <table id="infotbl">
       <tr>
         <th>Title:</th>
         <td><?php echo wt($result['title']); ?></td>
