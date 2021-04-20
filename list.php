@@ -69,6 +69,12 @@ function report_err($msg, $code) {
     <title>Add book</title>
     <meta name="viewport" 
         content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com"/>
+    <link
+      href="https://fonts.googleapis.com/css2?<?php echo CSS_FAMILIES;
+              ?>&display=swap"
+      rel="stylesheet"/>
+    <link href="main.css" rel="stylesheet"/>
   </head>
   <body>
     <h1>Error</h1>
@@ -272,32 +278,39 @@ function wt($str) {
     <title>Book list</title>
     <meta name="viewport" 
         content="width=device-width, initial-scale=1.0"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com"/>
+    <link
+      href="https://fonts.googleapis.com/css2?<?php echo CSS_FAMILIES;
+              ?>&display=swap"
+      rel="stylesheet"/>
+    <link href="main.css" rel="stylesheet"/>
     <style>
 
-:link {
-  text-decoration: none;
-  color: blue
+#btnrow {
+  margin-top: 2.5em;
+  margin-bottom: 2.5em;
 }
 
-:visited {
-  text-decoration: none;
-  color: blue
+.bki {
+  margin-top: 1em;
 }
 
     </style>
   </head>
   <body>
-    <h1>Book list</h1>
+    <h1><?php echo wt(LISTNAME_TEXT); ?></h1>
     
-    <p><a href="<?php echo MAINFORM_FILE_NAME; ?>">Add new book</a></p>
+    <p id="btnrow">
+      <a class="ctlbtn" href="<?php
+          echo MAINFORM_FILE_NAME; ?>">Add new book</a>
+    </p>
     
-    <hr/>
 <?php
 $bcount = count($books);
 for($i = 0; $i < $bcount; $i++) {
   $bk = $books[$i];
 ?>
-  <p><a href="<?php echo ISBNDETAIL_FILE_NAME; ?>?isbn=<?php
+  <p class="bki"><a href="<?php echo ISBNDETAIL_FILE_NAME; ?>?isbn=<?php
         echo $bk->getISBN(); ?>"><?php echo wt($bk->getTitle());
         ?></a></p>
 <?php
