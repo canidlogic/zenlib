@@ -65,6 +65,11 @@ th {
   cursor: pointer;
 }
 
+.comboctl {
+  font-size: larger;
+  font-family: <?php echo ZENLIB_CFG_MONOSPACE; ?>;
+}
+
 .filebtn {
   font-size: larger;
 }
