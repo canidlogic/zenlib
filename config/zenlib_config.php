@@ -18,13 +18,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Fill in form with data from a file upload -- begin by checking
     // for the uploaded file parameter
     if (array_key_exists('userfile', $_FILES) !== true) {
+      http_response_code(400);
       header('Content-Type: text/plain');
       echo "Uploaded file is missing!\n";
       exit;
     }
     
+    // Check that uploaded file isn't empty
+    if ($_FILES['userfile']['size'] < 1) {
+      http_response_code(400);
+      header('Content-Type: text/plain');
+      echo "Uploaded file is empty!\n";
+      exit;
+    }
+    
     // Next check that uploaded file isn't too large to parse
     if ($_FILES['userfile']['size'] > ZenLibPartial::MAX_XML_LENGTH) {
+      http_response_code(400);
       header('Content-Type: text/plain');
       echo "Uploaded XML file is too large!\n";
       exit;
@@ -34,9 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
       $ivals->readFromXML($_FILES['userfile']['tmp_name']);
     } catch (Exception $e) {
+      http_response_code(400);
       header('Content-Type: text/plain');
       echo "Error while parsing XML file:\n";
-      echo $e->getMessage . "!\n";
+      echo $e->getMessage() . "!\n";
       exit;
     }
     
@@ -58,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Exception $e) {
       http_response_code(400);
       header('Content-Type: text/plain');
-      echo "Input error:\n" . $e->getMessage();
+      echo "Input error:\n" . $e->getMessage() . "!\n";
       exit;
     }
     
@@ -93,10 +104,11 @@ $formval_limit = strval(getMaxUploadSize());
 
 // Determine initial values of each form element
 //
-$iv_isbndb_url = escval($ivals->getISBNdbURL());
 $iv_isbndb_key = escval($ivals->getISBNdbKey());
 $iv_db_path = escval($ivals->getDBPath());
 $iv_covers = escval($ivals->getDBCovers());
+$iv_base_url = escval($ivals->getBaseURL());
+$iv_base_lib = escval($ivals->getBaseLib());
 $iv_fn_list = escval($ivals->getMapList());
 $iv_fn_entry = escval($ivals->getMapEntry());
 $iv_fn_detail = escval($ivals->getMapDetail());
@@ -136,8 +148,9 @@ $iv_listname = JCQTypes::decodeUniString(
     <hr/>
 
     <p>Enter the following information to generate a parameters file
-    that can be used with the <span class="tt">zenlib_gen</span>
-    utility:</p>
+    that can be used with the
+    <a href="<?php echo ZENLIB_CFG_DIR_GEN; ?>">generation
+    utility</a>:</p>
     
     <form
         action="<?php echo ZENLIB_CFG_DIR_CONFIG; ?>" method="post">
@@ -146,24 +159,6 @@ $iv_listname = JCQTypes::decodeUniString(
       <table>
         <tr>
           <td colspan="2" class="secthead">ISBNdb connection</td>
-        </tr>
-        <tr>
-          <th>URL:</th>
-          <td class="ctl">
-            <input
-                name="isbndb_url"
-                id="isbndb_url"
-                class="mtext"
-                value="<?php echo $iv_isbndb_url; ?>"/>
-          </td>
-        </tr>
-        <tr>
-          <td>&nbsp;</td>
-          <td class="explain">
-            The ISBN number will be concatenated directly with this
-            given URL to form the query address for finding book
-            information by an ISBN number.
-          </td>
         </tr>
         <tr>
           <th>API&nbsp;key:</th>
@@ -228,6 +223,48 @@ $iv_listname = JCQTypes::decodeUniString(
         </tr>
         
         <tr>
+          <td colspan="2" class="secthead">Base locations</td>
+        </tr>
+        <tr>
+          <th>URL:</th>
+          <td class="ctl">
+            <input
+                name="base_url"
+                id="base_url"
+                class="mtext"
+                value="<?php echo $iv_base_url; ?>"/>
+          </td>
+        </tr>
+        <tr>
+          <td>&nbsp;</td>
+          <td class="explain">
+            The URL of the directory in which all the public Zenlib
+            scripts will be published.  This must be an absolute URL
+            according to the Jacques-Types URL definition <b>and</b> it
+            must end in a forward slash so that the script names defined
+            in the next section can be concatenated to this parameter to
+            form the full, absolute URL.
+          </td>
+        </tr>
+        <tr>
+          <th>Lib:</th>
+          <td class="ctl">
+            <input
+                name="base_lib"
+                id="base_lib"
+                class="mtext"
+                value="<?php echo $iv_base_lib; ?>"/>
+          </td>
+        </tr>
+        <tr>
+          <td>&nbsp;</td>
+          <td class="explain">
+            The absolute file path to the folder on the server in which
+            all the private Zenlib library scripts will be stored.
+          </td>
+        </tr>
+        
+        <tr>
           <td colspan="2" class="secthead">Script names</td>
         </tr>
         <tr>
@@ -243,8 +280,8 @@ $iv_listname = JCQTypes::decodeUniString(
         <tr>
           <td>&nbsp;</td>
           <td class="explain">
-            The file name of the script that displays the list of books,
-            including the filename extension of the script.
+            The file name of the script that displays the list of books.
+            Must follow the Jacques-Types filename definition.
           </td>
         </tr>
         <tr>
@@ -261,8 +298,8 @@ $iv_listname = JCQTypes::decodeUniString(
           <td>&nbsp;</td>
           <td class="explain">
             The file name of the script that allows a new book ISBN
-            number to be entered into the database, including the
-            filename extension of the script.
+            number to be entered into the database.  Must follow the
+            Jacques-Types filename definition.
           </td>
         </tr>
         <tr>
@@ -279,8 +316,8 @@ $iv_listname = JCQTypes::decodeUniString(
           <td>&nbsp;</td>
           <td class="explain">
             The file name of the script that displays details about a
-            specific book given an ISBN number, including the filename
-            extension of the script.
+            specific book given an ISBN number.  Must follow the
+            Jacques-Types filename definition.
           </td>
         </tr>
         <tr>
@@ -297,7 +334,8 @@ $iv_listname = JCQTypes::decodeUniString(
           <td>&nbsp;</td>
           <td class="explain">
             The file name of the script that adds new books into the
-            database, including the filename extension of the script.
+            database.  Must follow the Jacques-Types filename
+            definition.
           </td>
         </tr>
         
