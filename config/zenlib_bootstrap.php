@@ -213,6 +213,98 @@ function getMaxUploadSize() {
   return $result;
 }
 
+/*
+ * Check whether the given parameter is a string AND it only contains
+ * printing US-ASCII characters in range [0x20, 0x7E].
+ * 
+ * Parameters:
+ * 
+ *   $str : string | mixed - the value to check
+ * 
+ * Return:
+ * 
+ *   true if a plain ASCII string, false else
+ */
+function isPlainASCII($str) {
+  
+  // Check whether parameter is string
+  if (is_string($str) !== true) {
+    return false;
+  }
+  
+  // Check all characters within the string
+  $slen = strlen($str);
+  for($x = 0; $x < $slen; $x++) {
+    $c = ord($str[$x]);
+    if (($c < 0x20) || ($c > 0x7e)) {
+      return false;
+    }
+  }
+  
+  // If we got here, string value checks out
+  return true;
+}
+
+/*
+ * Escape a string so it can be included within a double-quoted string
+ * literal in PHP source code.
+ * 
+ * The string must pass isPlainASCII or an Exception is thrown.
+ * 
+ * Parameters:
+ * 
+ *   $str : string - the string to escape
+ * 
+ * Return:
+ * 
+ *   the escaped string
+ */
+function phpEsc($str) {
+  
+  // Check parameter
+  if (isPlainASCII($str) !== true) {
+    throw new Exception("zenlib_bootstrap-" . strval(__LINE__));
+  }
+  
+  // Escape backslashes
+  $str = str_replace("\\", "\\\\", $str);
+  
+  // Escape dollar signs and double quotes
+  $str = str_replace('$', "\\\$", $str);
+  $str = str_replace('"', "\\\"", $str);
+  
+  // Return escaped value
+  return $str;
+}
+
+/*
+ * Escape a string so it can be included within a string literal in
+ * generated SQL statements.
+ * 
+ * The string must pass isPlainASCII or an Exception is thrown.
+ * 
+ * Parameters:
+ * 
+ *   $str : string - the string to escape
+ * 
+ * Return:
+ * 
+ *   the escaped string
+ */
+function sqlEsc($str) {
+  
+  // Check parameter
+  if (isPlainASCII($str) !== true) {
+    throw new Exception("zenlib_bootstrap-" . strval(__LINE__));
+  }
+  
+  // Escape single quotes as doubled single quotes
+  $str = str_replace("'", "''", $str);
+  
+  // Return escaped value
+  return $str;
+}
+
 ////////////////////////////////////////////////////////////////////////
 //                                                                    //
 //                         ZenLibCfgXML class                         //
@@ -402,11 +494,13 @@ class ZenLibPartial {
   
   // Fields representing the parameter values
   //
-  private $m_isbndb_url;
   private $m_isbndb_key;
   
   private $m_db_path;
   private $m_db_covers;
+  
+  private $m_base_url;
+  private $m_base_lib;
   
   private $m_map_list;
   private $m_map_entry;
@@ -516,10 +610,11 @@ class ZenLibPartial {
    * indicating they have not been set yet.
    */
   public function __construct() {
-    $this->m_isbndb_url = '';
     $this->m_isbndb_key = '';
     $this->m_db_path = '';
     $this->m_db_covers = '';
+    $this->m_base_url = '';
+    $this->m_base_lib = '';
     $this->m_map_list = '';
     $this->m_map_entry = '';
     $this->m_map_detail = '';
@@ -533,10 +628,11 @@ class ZenLibPartial {
    * Note that the field values are NOT guaranteed to be valid.  Fields
    * that haven't been set will be empty strings.
    */
-  public function getISBNdbURL() { return $this->m_isbndb_url; }
   public function getISBNdbKey() { return $this->m_isbndb_key; }
   public function getDBPath() { return $this->m_db_path; }
   public function getDBCovers() { return $this->m_db_covers; }
+  public function getBaseURL() { return $this->m_base_url; }
+  public function getBaseLib() { return $this->m_base_lib; }
   public function getMapList() { return $this->m_map_list; }
   public function getMapEntry() { return $this->m_map_entry; }
   public function getMapDetail() { return $this->m_map_detail; }
@@ -562,10 +658,11 @@ class ZenLibPartial {
     }
     
     // Read available variables
-    $this->m_isbndb_url = self::readVarValue('isbndb_url');
     $this->m_isbndb_key = self::readVarValue('isbndb_key');
     $this->m_db_path = self::readVarValue('db_path');
     $this->m_db_covers = self::readVarValue('covers');
+    $this->m_base_url = self::readVarValue('base_url');
+    $this->m_base_lib = self::readVarValue('base_lib');
     $this->m_map_list = self::readVarValue('fn_list');
     $this->m_map_entry = self::readVarValue('fn_entry');
     $this->m_map_detail = self::readVarValue('fn_detail');
@@ -681,10 +778,11 @@ class ZenLibPartial {
     }
     
     // Read available variables
-    $this->m_isbndb_url = self::readXMLValue('isbndb_url', $vars);
     $this->m_isbndb_key = self::readXMLValue('isbndb_key', $vars);
     $this->m_db_path = self::readXMLValue('db_path', $vars);
     $this->m_db_covers = self::readXMLValue('db_covers', $vars);
+    $this->m_base_url = self::readXMLValue('base_url', $vars);
+    $this->m_base_lib = self::readXMLValue('base_lib', $vars);
     $this->m_map_list = self::readXMLValue('map_list', $vars);
     $this->m_map_entry = self::readXMLValue('map_entry', $vars);
     $this->m_map_detail = self::readXMLValue('map_detail', $vars);
@@ -707,14 +805,15 @@ class ZenLibPartial {
   public function normalize() {
     
     // Perform main normalization
-    $this->m_isbndb_url = JCQTypes::normURL($this->m_isbndb_url);
     $this->m_isbndb_key = trim($this->m_isbndb_key);
     $this->m_db_path = trim($this->m_db_path);
     $this->m_db_covers = trim($this->m_db_covers);
-    $this->m_map_list = JCQTypes::normURL($this->m_map_list);
-    $this->m_map_entry = JCQTypes::normURL($this->m_map_entry);
-    $this->m_map_detail = JCQTypes::normURL($this->m_map_detail);
-    $this->m_map_add = JCQTypes::normURL($this->m_map_add);
+    $this->m_base_url = JCQTypes::normURL($this->m_base_url);
+    $this->m_base_lib = trim($this->m_base_lib);
+    $this->m_map_list = JCQTypes::normFilename($this->m_map_list);
+    $this->m_map_entry = JCQTypes::normFilename($this->m_map_entry);
+    $this->m_map_detail = JCQTypes::normFilename($this->m_map_detail);
+    $this->m_map_add = JCQTypes::normFilename($this->m_map_add);
     $this->m_custom_name = trim($this->m_custom_name);
     
     // If the covers directory is not empty, then add a trailing
@@ -728,6 +827,20 @@ class ZenLibPartial {
       // separator
       if (($lastchar !== '/') && ($lastchar !== DIRECTORY_SEPARATOR)) {
         $this->m_db_covers = $this->m_db_covers . DIRECTORY_SEPARATOR;
+      }
+    }
+    
+    // If the base library directory is not empty, then add a trailing
+    // separator if needed
+    if (strlen($this->m_base_lib) > 0) {
+    
+      // Get last character of base library directory
+      $lastchar = $this->m_base_lib[strlen($this->m_base_lib) - 1];
+      
+      // If last character not a separator or a forward slash, add a
+      // separator
+      if (($lastchar !== '/') && ($lastchar !== DIRECTORY_SEPARATOR)) {
+        $this->m_base_lib = $this->m_base_lib . DIRECTORY_SEPARATOR;
       }
     }
   }
@@ -753,11 +866,13 @@ class ZenLibConfig {
   
   // Fields representing the parameter values
   //
-  private $m_isbndb_url;
   private $m_isbndb_key;
   
   private $m_db_path;
   private $m_db_covers;
+  
+  private $m_base_url;
+  private $m_base_lib;
   
   private $m_map_list;
   private $m_map_entry;
@@ -809,42 +924,48 @@ class ZenLibConfig {
    * 
    * Parameters:
    * 
-   *   $isbndb_url : string - the URL to query for book ISBN numbers;
-   *   the ISBN number will be concatenated to the end of this URL to
-   *   form the ISBNdb query path; this must pass JCQTypes::checkURL()
-   * 
    *   $isbndb_key : string - the API key for ISBNdb, which must pass
-   *   JCQTypes::blankCheck()
+   *   JCQTypes::blankCheck() AND isPlainASCII()
    * 
    *   $db_path : string - the absolute file path to the SQLite
-   *   database, which must pass JCQTypes::blankCheck()
+   *   database, which must pass JCQTypes::blankCheck() AND isPlainASCII
    * 
    *   $db_covers : string - the absolute file path to the directory
    *   holding the cached cover images; this must pass
    *   JCQTypes::blankCheck() AND it must end either in
-   *   DIRECTORY_SEPARATOR or forward slash
+   *   DIRECTORY_SEPARATOR or forward slash AND must pass isPlainASCII()
    * 
-   *   $map_list : string - the absolute URL to the book list page; this
-   *   must pass JCQTypes::checkURL()
+   *   $base_url : string - the absolute URL of the public scripts
+   *   directory; this must pass JCQTypes::checkURL() with IP addresses
+   *   allowed AND the last character must be a forward slash
    * 
-   *   $map_entry : string - the absolute URL to the ISBN entry page;
-   *   this must pass JCQTypes::checkURL()
+   *   $base_lib : string - the absolute file path to the directory
+   *   holding the private library scripts; this must pass
+   *   JCQTypes::blankCheck() AND it must end either in
+   *   DIRECTORY_SEPARATOR or forward slash AND must pass isPlainASCII()
    * 
-   *   $map_detail : string - the absolute URL to the book detail page;
-   *   this must pass JCQTypes::checkURL()
+   *   $map_list : string - the filename of the book list page; this
+   *   must pass JCQTypes::checkFilename()
    * 
-   *   $map_add : string - absolute URL to the add book page; this must
-   *   pass JCQTypes::checkURL()
+   *   $map_entry : string - the filename of the ISBN entry page; this
+   *   must pass JCQTypes::checkFilename()
+   * 
+   *   $map_detail : string - the filename of the book detail page; this
+   *   must pass JCQTypes::checkFilename()
+   * 
+   *   $map_add : string - filename of the add book page; this must pass
+   *   JCQTypes::checkFilename()
    * 
    *   $custom_name : string - the custom name to display above the book
    *   list; this must pass JCQTypes::blankCheck() AND
    *   JCQTypes::checkUniString()
    */
   protected function __construct(
-      $isbndb_url,
       $isbndb_key,
       $db_path,
       $db_covers,
+      $base_url,
+      $base_lib,
       $map_list,
       $map_entry,
       $map_detail,
@@ -852,16 +973,27 @@ class ZenLibConfig {
       $custom_name) {
     
     // Check parameters
-    if ((JCQTypes::checkURL($isbndb_url, true) !== true) ||
-        (JCQTypes::blankCheck($isbndb_key) !== true) ||
+    if ((JCQTypes::blankCheck($isbndb_key) !== true) ||
+        (isPlainASCII($isbndb_key) !== true) ||
         (JCQTypes::blankCheck($db_path) !== true) ||
+        (isPlainASCII($db_path) !== true) ||
         (JCQTypes::blankCheck($db_covers) !== true) ||
-        (JCQTypes::checkURL($map_list, true) !== true) ||
-        (JCQTypes::checkURL($map_entry, true) !== true) ||
-        (JCQTypes::checkURL($map_detail, true) !== true) ||
-        (JCQTypes::checkURL($map_add, true) !== true) ||
+        (isPlainASCII($db_covers) !== true) ||
+        (JCQTypes::checkURL($base_url, true) !== true) ||
+        (JCQTypes::blankCheck($base_lib) !== true) ||
+        (isPlainASCII($base_lib) !== true) ||
+        (JCQTypes::checkFilename($map_list) !== true) ||
+        (JCQTypes::checkFilename($map_entry) !== true) ||
+        (JCQTypes::checkFilename($map_detail) !== true) ||
+        (JCQTypes::checkFilename($map_add) !== true) ||
         (JCQTypes::blankCheck($custom_name) !== true) ||
         (JCQTypes::checkUniString($custom_name) !== true)) {
+      throw new Exception("zenlib_bootstrap-" . strval(__LINE__));
+    }
+    
+    // Check that base URL ends in a forward slash
+    $lastchar = $base_url[strlen($base_url) - 1];
+    if ($lastchar !== '/') {
       throw new Exception("zenlib_bootstrap-" . strval(__LINE__));
     }
     
@@ -871,11 +1003,19 @@ class ZenLibConfig {
       throw new Exception("zenlib_bootstrap-" . strval(__LINE__));
     }
     
+    // Check that base library directory ends in separator or forward
+    // slash
+    $lastchar = $base_lib[strlen($base_lib) - 1];
+    if (($lastchar !== '/') && ($lastchar !== DIRECTORY_SEPARATOR)) {
+      throw new Exception("zenlib_bootstrap-" . strval(__LINE__));
+    }
+    
     // Save the parameter values
-    $this->m_isbndb_url = $isbndb_url;
     $this->m_isbndb_key = $isbndb_key;
     $this->m_db_path = $db_path;
     $this->m_db_covers = $db_covers;
+    $this->m_base_url = $base_url;
+    $this->m_base_lib = $base_lib;
     $this->m_map_list = $map_list;
     $this->m_map_entry = $map_entry;
     $this->m_map_detail = $map_detail;
@@ -909,19 +1049,18 @@ class ZenLibConfig {
     }
     
     // Check each parameter
-    if (JCQTypes::checkURL($p->getISBNdbURL(), true) !== true) {
-      throw new Exception("Invalid ISBNdb URL");
-    }
-    
-    if (JCQTypes::blankCheck($p->getISBNdbKey()) !== true) {
+    if ((JCQTypes::blankCheck($p->getISBNdbKey()) !== true) ||
+        (isPlainASCII($p->getISBNdbKey()) !== true)) {
       throw new Exception("Invalid ISBNdb key");
     }
     
-    if (JCQTypes::blankCheck($p->getDBPath()) !== true) {
+    if ((JCQTypes::blankCheck($p->getDBPath()) !== true) ||
+        (isPlainASCII($p->getDBPath()) !== true)) {
       throw new Exception("Invalid database path");
     }
     
-    if (JCQTypes::blankCheck($p->getDBCovers()) !== true) {
+    if ((JCQTypes::blankCheck($p->getDBCovers()) !== true) ||
+        (isPlainASCII($p->getDBCovers()) !== true)) {
       throw new Exception("Invalid covers directory");
     }
     
@@ -931,20 +1070,41 @@ class ZenLibConfig {
       throw new Exception("Invalid covers directory");
     }
     
-    if (JCQTypes::checkURL($p->getMapList(), true) !== true) {
-      throw new Exception("Invalid list script URL");
+    if (JCQTypes::checkURL($p->getBaseURL(), true) !== true) {
+      throw new Exception("Invalid base URL");
     }
     
-    if (JCQTypes::checkURL($p->getMapEntry(), true) !== true) {
-      throw new Exception("Invalid entry script URL");
+    $base_url = $p->getBaseURL();
+    $lastchar = $base_url[strlen($base_url) - 1];
+    if ($lastchar !== '/') {
+      throw new Exception("Base URL must end in / character");
     }
     
-    if (JCQTypes::checkURL($p->getMapDetail(), true) !== true) {
-      throw new Exception("Invalid detail script URL");
+    if ((JCQTypes::blankCheck($p->getBaseLib()) !== true) ||
+        (isPlainASCII($p->getBaseLib()) !== true)) {
+      throw new Exception("Invalid library script directory");
     }
     
-    if (JCQTypes::checkURL($p->getMapAdd(), true) !== true) {
-      throw new Exception("Invalid add script URL");
+    $base_lib = $p->getBaseLib();
+    $lastchar = $base_lib[strlen($base_lib) - 1];
+    if (($lastchar !== '/') && ($lastchar !== DIRECTORY_SEPARATOR)) {
+      throw new Exception("Invalid library script directory");
+    }
+    
+    if (JCQTypes::checkFilename($p->getMapList()) !== true) {
+      throw new Exception("Invalid list script filename");
+    }
+    
+    if (JCQTypes::checkFilename($p->getMapEntry()) !== true) {
+      throw new Exception("Invalid entry script filename");
+    }
+    
+    if (JCQTypes::checkFilename($p->getMapDetail()) !== true) {
+      throw new Exception("Invalid detail script filename");
+    }
+    
+    if (JCQTypes::checkFilename($p->getMapAdd()) !== true) {
+      throw new Exception("Invalid add script filename");
     }
     
     if (JCQTypes::blankCheck($p->getCustomName()) !== true) {
@@ -957,16 +1117,33 @@ class ZenLibConfig {
     
     // Construct new object
     return new ZenLibConfig(
-      $p->getISBNdbURL(),
       $p->getISBNdbKey(),
       $p->getDBPath(),
       $p->getDBCovers(),
+      $p->getBaseURL(),
+      $p->getBaseLib(),
       $p->getMapList(),
       $p->getMapEntry(),
       $p->getMapDetail(),
       $p->getMapAdd(),
       $p->getCustomName());
   }
+  
+  /*
+   * Access functions for each of the field values.
+   * 
+   * The field values ARE guaranteed to be valid in this object.
+   */
+  public function getISBNdbKey() { return $this->m_isbndb_key; }
+  public function getDBPath() { return $this->m_db_path; }
+  public function getDBCovers() { return $this->m_db_covers; }
+  public function getBaseURL() { return $this->m_base_url; }
+  public function getBaseLib() { return $this->m_base_lib; }
+  public function getMapList() { return $this->m_map_list; }
+  public function getMapEntry() { return $this->m_map_entry; }
+  public function getMapDetail() { return $this->m_map_detail; }
+  public function getMapAdd() { return $this->m_map_add; }
+  public function getCustomName() { return $this->m_custom_name; }
   
   /*
    * Serialize this configuration object to XML.
@@ -986,9 +1163,6 @@ class ZenLibConfig {
     
     // Write each variable
     $result = $result . '  ' .
-                self::writeVar('isbndb_url', $this->m_isbndb_url) .
-                "\n";
-    $result = $result . '  ' .
                 self::writeVar('isbndb_key', $this->m_isbndb_key) .
                 "\n";
     $result = $result . '  ' .
@@ -996,6 +1170,12 @@ class ZenLibConfig {
                 "\n";
     $result = $result . '  ' .
                 self::writeVar('db_covers', $this->m_db_covers) .
+                "\n";
+    $result = $result . '  ' .
+                self::writeVar('base_url', $this->m_base_url) .
+                "\n";
+    $result = $result . '  ' .
+                self::writeVar('base_lib', $this->m_base_lib) .
                 "\n";
     $result = $result .  '  ' .
                 self::writeVar('map_list', $this->m_map_list) .
