@@ -1,9 +1,9 @@
 <?php
 
 /*
- * Include the common utilities script
+ * Include zenlib
  */
-require_once 'isbn_util.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'zenlib_vars.php';
 
 ////////////////////////////////////////////////////////////////////////
 //                                                                    //
