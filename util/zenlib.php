@@ -296,7 +296,7 @@ function checkISBN($str) {
       $checkv = 10;
     } else {
       // Shouldn't happen
-      throw new Exception("isbn_util-" . strval(__LINE__));
+      throw new Exception("zenlib-" . strval(__LINE__));
     }
     
     // Compute the weighted sum of the non-check digits
@@ -344,7 +344,7 @@ function checkISBN($str) {
     
   } else {
     // Shouldn't happen
-    throw new Exception("isbn_util-" . strval(__LINE__));
+    throw new Exception("zenlib-" . strval(__LINE__));
   }
   
   // Return result
