@@ -1,9 +1,10 @@
 <?php
 
 /*
- * Include zenlib
+ * Include zenlib and Gary
  */
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'zenlib_vars.php';
+require_once __DIR__ . DIRECTORY_SEPARATOR . 'gary.php';
 
 ////////////////////////////////////////////////////////////////////////
 //                                                                    //
@@ -116,12 +117,8 @@ function report_err($msg, $code) {
  * The given database connection must be an open SQLite3 database
  * connection with read/write access to the local database.
  * 
- * If you have credentials for ISBNdb, the two ISBNdb parameters must be
- * the URL for the API and the API key.  If you do not have credentials,
- * set the URL to NULL and the key will be ignored (and can also be set
- * to NULL).  The URL is for querying by book ISBN.  It is assumed that
- * the book ISBN can be suffixed to the given URL to get the proper
- * query location.
+ * UPDATE: ISBNdb credentials are ignored.  Instead, this function calls
+ * through to Gary and Gary handles query details.
  * 
  * If the database is unable to find any information about the book,
  * false is returned.  Otherwise, the return value is a parsed JSON
@@ -131,13 +128,9 @@ function report_err($msg, $code) {
  * information about the book.  If a cache entry is found, it is
  * returned without further queries.
  * 
- * If no cache entry is found for the ISBN number, then check whether
- * ISBNdb credentials were provided.  If they were provided, a query is
- * made to ISBNdb.  If this query succeeds, then the result is stored in
- * the local database cache.  If no ISBNdb credentials were provided,
- * then this function is only able to return information about books
- * already in the local database cache, and all other queries will
- * return false.
+ * If no cache entry is found for the ISBN number, then query Gary for
+ * the information.  If this query succeeds, then the result is stored
+ * in the local database cache.
  * 
  * Parameters:
  * 
@@ -145,12 +138,9 @@ function report_err($msg, $code) {
  * 
  *   $db : SQLite3 - the open database connection to local database
  * 
- *   $isbndb_url : string | null - the URL for querying by ISBN, or NULL
- *   if no credentials for ISBNdb
+ *   $isbndb_url - (ignored)
  * 
- *   $isbndb_key : string | null - the API key for ISBNdb; ignored and
- *   can be set to NULL if isbndb_url parameter is NULL, else this must
- *   be a string
+ *   $isbndb_key - (ignored)
  * 
  * Return:
  * 
@@ -165,14 +155,6 @@ function dbISBN($isbn, $db, $isbndb_url, $isbndb_key) {
   }
   if (($db instanceof SQLite3) !== true) {
     throw new Exception("isbn_detail-" . strval(__LINE__));
-  }
-  if (is_null($isbndb_url) === false) {
-    if (is_string($isbndb_url) !== true) {
-      throw new Exception("isbn_detail-" . strval(__LINE__));
-    }
-    if (is_string($isbndb_key) !== true) {
-      throw new Exception("isbn_detail-" . strval(__LINE__));
-    }
   }
   
   // Query the local database cache for the book
@@ -231,71 +213,11 @@ function dbISBN($isbn, $db, $isbndb_url, $isbndb_key) {
     return $result;
   }
   
-  // If we get here, we don't have the ISBN in the local cache; if no
-  // ISBNdb credentials were provided, return false because we have no
-  // other place to query
-  if (is_null($isbndb_url)) {
-    return false;
-  }
+  // If we get here, we don't have the ISBN in the local cache, so now
+  // we query Gary
+  $result = gary_invoke_python('json', $isbn);
   
-  // We have ISBNdb credentials and we don't have local cache entry, so
-  // now we query ISBNdb
-  $query_res = curl_init();
-  if ($query_res === false) {
-    throw new Exception("Error initializing cURL");
-  }
-  
-  // Wrap cURL session in try-finally so it always gets closed on the
-  // way out
-  try {
-    // Determine the cURL query headers and the query URL
-    $query_headers = array(
-                      "Content-Type: application/json",
-                      "Authorization: $isbndb_key");
-    $query_url = $isbndb_url . $isbn;
-    
-    // Set the URL and the headers for the request
-    if (curl_setopt($query_res, CURLOPT_URL, $query_url) !== true) {
-      throw new Exception("Can't set cURL URL");
-    }
-    if (curl_setopt($query_res, CURLOPT_HTTPHEADER, $query_headers)
-          !== true) {
-      throw new Exception("Can't set cURL headers");
-    }
-    
-    // Indicate that we want to receive response as a string rather than
-    // sending it directly to output
-    if (curl_setopt($query_res, CURLOPT_RETURNTRANSFER, true)
-          !== true) {
-      throw new Exception("Can't set cURL return transfer");
-    }
-    
-    // Attempt to get the query result
-    $result = curl_exec($query_res);
-    if ($result === false) {
-      throw new Exception("cURL query operation failed");
-    }
-    
-    // If 200 OK status was not returned, couldn't find information
-    if (curl_getinfo($query_res, CURLINFO_RESPONSE_CODE) !== 200) {
-      $result = NULL;
-    }
-    
-  } finally {
-    // Close session
-    if (is_null($query_res) !== true) {
-      curl_close($query_res);
-      unset($query_res);
-    }
-  }
-  
-  // If we didn't get any result from ISBNdb, then return false
-  if (is_null($result)) {
-    return false;
-  }
-  
-  // If we got here, we have a fresh result from ISBNdb; store the
-  // original JSON so we will be able to cache it
+  // Store the original JSON so we will be able to cache it
   $json = $result;
   
   // Decode the inner book object within the JSON
