@@ -52,7 +52,7 @@ $barcodes = usingScanner();
 <?php } ?>
 
     <form
-        action="<?php echo ISBNDETAIL_FILE_NAME; ?>"
+        action="isbn_query.php"
         method="get"
         accept-charset="utf-8">
       <input type="hidden" name="action" id="action" value="add"/>
