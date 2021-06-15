@@ -311,6 +311,11 @@ $formval_limit = strval(getMaxUploadSize());
 
     <hr/>
 
+    <p><b>Important:</b> In addition to the generated files, you must
+    also manually configure a <b class="tt">gary.php</b> script from the
+    Gary project and place it in the same directory as the other Zenlib
+    public scripts.</p>
+
     <p>The generated <b class="tt">index.php</b> page should be placed
     in the same directory as the public library scripts.  It simply
     redirects the user to the book list page.</p>
