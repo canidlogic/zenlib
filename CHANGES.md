@@ -1,5 +1,11 @@
 # Zenlib Changes
 
+## Version 0.7 Alpha
+
+This is a small update that simply adds the `query_gary_json.php` script to `/public`.  This script is just a minor alteration of `query_gary.php` that invokes the JSON query mode rather than the simple query mode.
+
+Adding this script allows for automated export from the Zenlib database, using the `/public/isbn_export.php` script to get the ISBN numbers of all the books in the database, and the new `/public/query_gary_json.php` script to get the cached ISBNdb JSON information about the book.
+
 ## Version 0.6 Alpha
 
 The big change in this version is integrating Gary to fix errors from querying ISBNdb directly.
